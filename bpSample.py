@@ -1,11 +1,11 @@
 import numpy as np
 import os
-import zmq
+# import zmq
 import socket
 import time
 import bpHandler
 import cv2
-import sonarDisplay 
+from sonarDisplay import warpSonar 
 
 if __name__ == "__main__":
     usege = """usage:\n  
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     winName = 'sonData'
     cv2.namedWindow(winName, 0)
     ws = warpSonar()
-    warpIm = True
+    warpIm = False
 
     try:    
         statusPort  = 52102
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         udpStatusSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udpStatusSock.bind(("", statusPort))
 
-        context = zmq.Context()
+        # context = zmq.Context()
         M1200dTcpSock = None
 
         # get sonar status (and ip), as sonar init procedure...
