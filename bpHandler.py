@@ -160,7 +160,7 @@ def createOculusFireMsg(hdr, nBins = 256, pingRate=10, gammaCorrection=0xff, rng
     mode 2 - High Frequency Mode (narrow aperture, target identification)
     type: uint8_t
     '''
-    if int(apetrure) != 1 and int(aperture) != 2:
+    if int(aperture) != 1 and int(aperture) != 2:
         aperture = 1
         print('bad aperture value, 1->wide, 2->narrow')
     masterMode = int(aperture) # type uint8_t
