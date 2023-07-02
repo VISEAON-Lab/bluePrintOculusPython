@@ -9,6 +9,8 @@ import os
 
 import socket
 
+from sonarDisplay import warpSonar
+
 if not os.path.exists("oculus_h.pkl"):
     import bpStructs as bpcs
     bpcs.saveStructs2Pkl()
@@ -18,10 +20,10 @@ else:
         bpStructs = pickle.load(fid)
 
 
-#fileName = r'wiresharkRec/oculus.pcapng'
-#fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
-fileName = r'wiresharkRec/oculus_512beams_rangeChange.pcapng'
-#fileName = r'wiresharkRec/oculus_noChange.pcapng'
+# fileName = r'wiresharkRec/oculus.pcapng'
+fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
+# fileName = r'wiresharkRec/oculus_512beams_rangeChange.pcapng'
+# fileName = r'wiresharkRec/oculus_noChange.pcapng'
 with open("oculus_h.pkl", 'rb') as fid:
     bpStructs = pickle.load(fid)
 
@@ -178,16 +180,71 @@ def structParseByHeader(payload):
 
     return ret
     
+# # slow
+# def cartesian_to_polar(metadata, sonar_data):
+#     n_ranges = metadata['nRanges']
+#     azimuth_bounds = np.deg2rad(metadata['beamsDeg'])
+#     minus_width = int(np.floor(n_ranges * np.sin(azimuth_bounds[0])))
+#     plus_width = int(np.ceil(n_ranges * np.sin(azimuth_bounds[-1])))
+#     width = plus_width - minus_width
+#     origin_x = abs(minus_width)
+#     new_image = np.zeros(shape=(n_ranges, width), dtype='uint8')
+
+#     db = (azimuth_bounds[-1] - azimuth_bounds[0]) / metadata['nBeams'] if metadata['nBeams'] > 0 else 1
+#     for x in range(new_image.shape[1]):
+#         for y in range(new_image.shape[0]):
+#             dx = x - origin_x
+#             dy = new_image.shape[0] - y
+#             range_val = np.sqrt(dx * dx + dy * dy)
+#             azimuth = np.arctan2(dx, dy)
+#             xp = int(range_val)
+#             yp = int((azimuth - azimuth_bounds[0]) / db)
+#             if xp >= 0 and xp < sonar_data.shape[0] and yp >= 0 and yp < sonar_data.shape[1]:
+#                 new_image[y, x] = sonar_data[xp, yp]
+#     return new_image
+
+
+
+
+# Fast
+def cartesian_to_polar(metadata, sonar_data):
+    n_ranges = metadata['nRanges']
+    azimuth_bounds = np.deg2rad(metadata['beamsDeg'])
+    minus_width = int(np.floor(n_ranges * np.sin(azimuth_bounds[0])))
+    plus_width = int(np.ceil(n_ranges * np.sin(azimuth_bounds[-1])))
+    width = plus_width - minus_width
+    origin_x = abs(minus_width)
+
+    db = (azimuth_bounds[-1] - azimuth_bounds[0]) / metadata['nBeams'] if metadata['nBeams'] > 0 else 1
+    dy, dx = np.indices((n_ranges, width))
+    dx -= origin_x
+    dy = n_ranges - dy
+
+    range_val = np.sqrt(dx * dx + dy * dy).astype('int')
+    azimuth = np.arctan2(dx, dy)
+    yp = ((azimuth - azimuth_bounds[0]) / db).astype('int')
+
+    mask = (range_val >= 0) & (range_val < sonar_data.shape[0]) & (yp >= 0) & (yp < sonar_data.shape[1])
+    new_image = np.zeros(shape=(n_ranges, width), dtype='uint8')
+    new_image[dy[mask], dx[mask] + origin_x] = sonar_data[range_val[mask], yp[mask]]
+
+    return new_image
+
+
 
 
 cv2.namedWindow('aa', 0)
+cv2.namedWindow('bb', 0)
+cv2.namedWindow('cc', 0)
 def process_pcap(file_name):
     print('Opening {}...'.format(file_name))
 
-    client = '169.254.70.88:54375'
+    client_1 = '169.254.70.88:54375'
+    client_2 = '169.254.99.25:54375'
     server = '169.254.70.16:52100'
 
-    (client_ip, client_port) = client.split(':')
+    (client_1_ip, client_port) = client_1.split(':')
+    (client_2_ip, client_port) = client_2.split(':')
     (server_ip, server_port) = server.split(':')
     
     count = 0
@@ -203,6 +260,8 @@ def process_pcap(file_name):
     h = 199
     mSize = 999999
     metadata = None
+
+    ws = warpSonar()
     
     for (pkt_data, pkt_metadata,) in RawPcapReader(file_name):
         count += 1
@@ -240,7 +299,7 @@ def process_pcap(file_name):
 
         payloadLen = ip_pkt.len - (ip_pkt.ihl * 4) - (ip_pkt[TCP].dataofs * 4)
 
-        if (ip_pkt.src == client_ip) and (ip_pkt.dst == server_ip):
+        if ((ip_pkt.src == client_1_ip) or (ip_pkt.src == client_2_ip)) and (ip_pkt.dst == server_ip):
             ## PC -> Sonar
             if payloadLen > 0:
                 print('-start'*10, '--- PC->Sonar')
@@ -258,7 +317,7 @@ def process_pcap(file_name):
                 continue
             
             
-        elif (ip_pkt.src == server_ip) and (ip_pkt.dst == client_ip):
+        elif (ip_pkt.src == server_ip) and ((ip_pkt.dst == client_1_ip) or (ip_pkt.dst == client_2_ip)):
             ## Sonar -> pc
             
             if payloadLen > 0:
@@ -275,12 +334,25 @@ def process_pcap(file_name):
                         print('-->', offset, w, h)
 
                         img = np.frombuffer(imData[offset:offset+w*h], dtype='uint8').reshape((h, w))
+                        # polar = cartesian_to_polar(metadata, np.frombuffer(imData[offset:offset+w*h], dtype='uint8').reshape((h, w)))
+                        polar = cartesian_to_polar(metadata, img)
+                        
+                        inverted_img = np.flipud(img)
+                        polar_inverted = cartesian_to_polar(metadata, inverted_img)
+
+
                         
                         with open('inData.pkl', 'wb') as fid:
                             pickle.dump([metadata, img], fid)
+
                         cv2.imwrite('input.jpg', img)
                         cv2.imshow('aa', img);
-                        cv2.waitKey(0)
+                        # print('date', data)
+                        print("image size", img.shape)
+                        # showIm = ws.warpSonarImage(metadata, cropped)
+                        cv2.imshow('bb', polar);
+                        cv2.imshow('cc', polar_inverted);
+                        cv2.waitKey(1)
                         imStarted = False
                         imData = b''
                         sumData = 0

@@ -16,15 +16,9 @@ class warpSonar:
         return 
 
     def createMaps(self, srcX, srcY, degVec):
-
         self.srcY = srcY
         self.srcX = srcX
-
         radVec = np.deg2rad(degVec)
-
-        #radVec2 = np.linspace(radVec[0], radVec[-1], len(radVec)*2)
-        #import ipdb; ipdb.set_trace()
-
         extW = srcX/2+srcY*np.sin(radVec[0])
         
         if extW < 0:
@@ -40,8 +34,6 @@ class warpSonar:
         denFac  = 1
 
         for i,teta in enumerate(np.array(np.linspace(-ang,ang,srcX*denFac))):
-        #for i,teta in enumerate(radVec):
-            #for j in range(srcY):
             for j in np.linspace(0, srcY, srcY*denFac):
                 b=j
                 py = b*np.cos(teta)
@@ -52,17 +44,14 @@ class warpSonar:
                 except:
                     pass
 
-
     def warpSonarImage(self, metadata, img):
-        sx,sy=img.shape[1],img.shape[0]
-        if (sx != self.srcX) or (sy != self.srcY):
+        sx,sy = img.shape[1], img.shape[0]
+        if sx != self.srcX or sy != self.srcY:
             degVec = metadata["beamsDeg"]
-            self.createMaps(sx,sy,degVec)
+            self.createMaps(sx, sy, degVec)
             print('init')
 
-        # warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_LINEAR)
-        warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_CUBIC)
-        
+        warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_NEAREST)
         return warped
 
 

@@ -31,7 +31,7 @@
 		"--env=XAUTHORITY=${env:XAUTH}",
 		"--volume=${env:XAUTH}:${env:XAUTH}",
 		"--net=host",
-		"--volume=/mnt/4CD9-9D85/proj/bluePrintOculusPython:/home/catkin_ws/src/bluePrintOculusPython"
+		"--volume=/home/zeged/proj/bluePrintOculusPython:/home/catkin_ws/src/bluePrintOculusPython"
 		// "--volume=/media/ilan/my4TB4/rov_eilat:/workspaces/RovVision2_old/bags"
 	],
 	"customizations": {
