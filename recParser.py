@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import cv2
 import os
+from colormaps import ColorMap
 
 import socket
 
@@ -20,8 +21,8 @@ else:
         bpStructs = pickle.load(fid)
 
 
-# fileName = r'wiresharkRec/oculus.pcapng'
-fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
+fileName = r'wiresharkRec/oculus.pcapng'
+# fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
 # fileName = r'wiresharkRec/oculus_512beams_rangeChange.pcapng'
 # fileName = r'wiresharkRec/oculus_noChange.pcapng'
 with open("oculus_h.pkl", 'rb') as fid:
@@ -179,7 +180,31 @@ def structParseByHeader(payload):
         #import ipdb; ipdb.set_trace()
 
     return ret
+
+
+
+
+# def color_map_image(image, color_map):
+#     # Allocate space for the color image.
+#     color_image = np.empty((image.shape[0], image.shape[1], 3), dtype=np.uint8)
+
+#     # Map each pixel to its color.
+#     for r in range(image.shape[0]):
+#         for c in range(image.shape[1]):
+#             color_image[r, c] = color_map.lookup(image[r, c])
+
+#     return color_image
+
+def color_map_image(image, color_map):
+    # color_image = color_map.data['_inferno_data_uint8'][image]
+    color_image = color_map.data['_inferno_data_float'][image]
+
     
+    # color_image = color_image.astype(np.float32)
+    # color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2BGR)
+    return color_image
+
+
 # # slow
 # def cartesian_to_polar(metadata, sonar_data):
 #     n_ranges = metadata['nRanges']
@@ -197,10 +222,11 @@ def structParseByHeader(payload):
 #             dy = new_image.shape[0] - y
 #             range_val = np.sqrt(dx * dx + dy * dy)
 #             azimuth = np.arctan2(dx, dy)
-#             xp = int(range_val)
+#             # xp = int(range_val)
+#             xp = range_val
 #             yp = int((azimuth - azimuth_bounds[0]) / db)
 #             if xp >= 0 and xp < sonar_data.shape[0] and yp >= 0 and yp < sonar_data.shape[1]:
-#                 new_image[y, x] = sonar_data[xp, yp]
+#                 new_image[y, x] = sonar_data[int(xp), int(yp)]
 #     return new_image
 
 
@@ -235,7 +261,7 @@ def cartesian_to_polar(metadata, sonar_data):
 
 cv2.namedWindow('aa', 0)
 cv2.namedWindow('bb', 0)
-cv2.namedWindow('cc', 0)
+# cv2.namedWindow('cc', 0)
 def process_pcap(file_name):
     print('Opening {}...'.format(file_name))
 
@@ -262,6 +288,7 @@ def process_pcap(file_name):
     metadata = None
 
     ws = warpSonar()
+    colormapper = ColorMap()
     
     for (pkt_data, pkt_metadata,) in RawPcapReader(file_name):
         count += 1
@@ -337,9 +364,11 @@ def process_pcap(file_name):
                         # polar = cartesian_to_polar(metadata, np.frombuffer(imData[offset:offset+w*h], dtype='uint8').reshape((h, w)))
                         polar = cartesian_to_polar(metadata, img)
                         
-                        inverted_img = np.flipud(img)
-                        polar_inverted = cartesian_to_polar(metadata, inverted_img)
+                        # inverted_img = np.flipud(img)
+                        # polar_inverted = cartesian_to_polar(metadata, inverted_img)
 
+                        img = color_map_image(img, colormapper)
+                        polar = color_map_image(polar, colormapper)
 
                         
                         with open('inData.pkl', 'wb') as fid:
@@ -351,7 +380,7 @@ def process_pcap(file_name):
                         print("image size", img.shape)
                         # showIm = ws.warpSonarImage(metadata, cropped)
                         cv2.imshow('bb', polar);
-                        cv2.imshow('cc', polar_inverted);
+                        # cv2.imshow('cc', polar_inverted);
                         cv2.waitKey(1)
                         imStarted = False
                         imData = b''
