@@ -1,11 +1,14 @@
 import numpy as np
 import os
 import re
+import sys
 
+colormap_module_dir_path = os.path.abspath(
+    os.path.dirname(sys.modules[__name__].__file__))
 
 
 class ColorMap:
-    def __init__(self, filename='ColorMaps.cpp'):
+    def __init__(self, filename=os.path.join(colormap_module_dir_path,'ColorMaps.cpp')):
         self.data = self.parse_cpp_file(filename)
 
     # # Simple class to mimic the color map functionality in the reference.

@@ -21,8 +21,8 @@ else:
         bpStructs = pickle.load(fid)
 
 
-fileName = r'wiresharkRec/oculus.pcapng'
-# fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
+# fileName = r'wiresharkRec/oculus.pcapng'
+fileName = r'wiresharkRec/oculus_dynamic_change_range.pcapng'
 # fileName = r'wiresharkRec/oculus_512beams_rangeChange.pcapng'
 # fileName = r'wiresharkRec/oculus_noChange.pcapng'
 with open("oculus_h.pkl", 'rb') as fid:
@@ -360,7 +360,7 @@ def process_pcap(file_name):
                     if sumData > mSize:
                         print('-->', offset, w, h)
 
-                        img = np.frombuffer(imData[offset:offset+w*h], dtype='uint8').reshape((h, w))
+                        img = np.frombuffer(imData[offset - 2*w:offset+w*h -2*w], dtype='uint8').reshape((h, w))
                         # polar = cartesian_to_polar(metadata, np.frombuffer(imData[offset:offset+w*h], dtype='uint8').reshape((h, w)))
                         polar = cartesian_to_polar(metadata, img)
                         

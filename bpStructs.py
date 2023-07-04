@@ -36,8 +36,10 @@ config = parser.xml_generator_configuration_t(
     xml_generator=generator_name,
     compiler="gcc")
 
+# print(this_module_dir_path)
+
 # Parsing source file
-decls = parser.parse(["Oculus.h"], config)
+decls = parser.parse([os.path.join(this_module_dir_path, "Oculus.h")], config)
 global_ns = declarations.get_global_namespace(decls)
 
 # Get object that describes unittests namespace

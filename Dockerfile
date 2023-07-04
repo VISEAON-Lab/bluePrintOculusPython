@@ -5,6 +5,9 @@ RUN apt-get install -y python3-pip
 RUN pip3 install pygccxml
 RUN pip3 install castxml
 
+# for recParser
+RUN pip3 install scapy
+
 
 
 
