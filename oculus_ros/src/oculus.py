@@ -13,16 +13,20 @@ import socket
 import time
 
 from sonarDisplay import warpSonar
+from colormaps import ColorMap
+
 
 # from marine_msgs import PingInfo
 # from marine_acoustic_msgs import PingInfo
 
-from oculus_ros.msg import PingInfo, SonarImageData, ProjectedSonarImage
+# from oculus_ros.msg import PingInfo, SonarImageData, ProjectedSonarImage
 
 # t = PingInfo()
 
 rospy.init_node('blueprint_oculus', anonymous=True)
-image_pub = rospy.Publisher("image_topic",Image, queue_size=10) 
+polar_pub = rospy.Publisher("FLS/polar",Image, queue_size=10)
+cartesian_pub = rospy.Publisher("FLS/cartesian",Image, queue_size=10) 
+
 bridge = CvBridge()
 
 # def callback(data):
@@ -39,7 +43,13 @@ bridge = CvBridge()
 
 
 ws = warpSonar()
-warpIm = False
+# warpIm = False
+
+
+colormapper = ColorMap()
+
+cv2.namedWindow('polar', 0)
+
 
 
 
@@ -61,7 +71,7 @@ try:
       r = rospy.Rate(1000)
 
       while True:
-            
+            time.sleep(0.001)
             status = bpHandler.getStatusMsg(udpStatusSock)
             if status is not None:
                statusCnt += 1
@@ -77,6 +87,13 @@ try:
                M1200dTcpSock.connect( ("%s" %status['status']['ipAddr'], tcpPort) )
                break
 
+            
+            if rospy.is_shutdown():
+                  print('exiting')
+                  # exit()
+                  break
+            r.sleep()
+
       
       # Handle sonar data
       if M1200dTcpSock is not None:
@@ -85,7 +102,7 @@ try:
             nBins           = 256
             pingRate        = 15    #[Hz] 
             gammaCorrection = 0xff  # 0xff -> 1 byte (0-255)
-            rng             = 12    # [m] # in wide aperature up to 40[m], in narrow, up to 10[m]
+            rng             = 10    # [m] # in wide aperature up to 40[m], in narrow, up to 10[m]
             gainVal         = 60    # [%]
             sOs             = 0     # [m/s], speed of sound, 0->precalculated
             salinity        = 0     # ? (ppt}
@@ -128,36 +145,58 @@ try:
                   pingCnt += 1
                   print(sonData)
 
-                  ping = PingInfo()
+                  # ping = PingInfo()
                   # ping.frequency = 0
                   # ping.sound_speed = 0
                   # ping.tx_beamwidths = 0
                   # ping.rx_beamwidths = 0
                   # print(ping)
 
-                  image_data = SonarImageData()
+                  # image_data = SonarImageData()
                   # print(image_data)
 
-                  projected_sonar_image= ProjectedSonarImage()
-                  projected_sonar_image.ping_info = ping
-                  projected_sonar_image.image = image_data
-                  print(projected_sonar_image)
+                  # projected_sonar_image= ProjectedSonarImage()
+                  # projected_sonar_image.ping_info = ping
+                  # projected_sonar_image.image = image_data
+                  # print(projected_sonar_image)
 
 
                   nBeams = sonData[0]["nBeams"]
                   nRanges = sonData[0]["nRanges"]
 
-                  showIm = sonData[1]
-                  if warpIm:
-                        showIm = ws.warpSonarImage(sonData[0], sonData[1])
+                  cartesian = sonData[1]
+                  # if warpIm:
+
+                  cartesian = cv2.rotate(cartesian, cv2.ROTATE_180)
+                  
+                  polar = ws.warpSonarImage(sonData[0], sonData[1])
+
+                  cartesian_color = colormapper.data['_inferno_data_float'][cartesian]
+                  polar_color = colormapper.data['_inferno_data_float'][polar]
 
                   # processed_image = bridge.cv2_to_imgmsg(showIm, "bgr8")
-                  processed_image = bridge.cv2_to_imgmsg(showIm, "mono8")
 
-                  image_pub.publish(processed_image)
+
+                  cartesian_color_8bit = cv2.convertScaleAbs(cartesian_color, alpha=(255.0))
+                  cartesian_msg = bridge.cv2_to_imgmsg(cartesian_color_8bit, "bgr8")
+                  
+                  polar_color_8bit = cv2.convertScaleAbs(polar_color, alpha=(255.0))
+                  polar_msg = bridge.cv2_to_imgmsg(polar_color_8bit, "bgr8")
+
+
+
+                  cartesian_pub.publish(cartesian_msg)
+                  polar_pub.publish(polar_msg)
+
+                  # rotate image 180 degrees
+
+                  # save image
+                  cv2.imwrite(r'/home/catkin_ws/src/bluePrintOculusPython/oculus_ros/src/image.jpg', polar_color)
+
+                  cv2.imshow("polar", polar_color)
                   
                   #   cv2.imshow(winName, showIm)
-                  #   key = cv2.waitKey(1)&0xff
+                  key = cv2.waitKey(1)&0xff
                   #   if key==ord('h'):
                   #       print('set 512 bins')
                   #       nBins = 512
@@ -237,8 +276,9 @@ except:
    import traceback
    traceback.print_exc()
 finally:
-   print("terminate connection to sonar:tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
-   M1200dTcpSock.close() #"tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
+   if M1200dTcpSock is not None:
+      print("terminate connection to sonar:tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
+      M1200dTcpSock.close() #"tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
    
          
    

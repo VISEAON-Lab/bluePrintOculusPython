@@ -54,16 +54,41 @@ class warpSonar:
 
 
     def warpSonarImage(self, metadata, img):
-        sx,sy=img.shape[1],img.shape[0]
-        if (sx != self.srcX) or (sy != self.srcY):
-            degVec = metadata["beamsDeg"]
-            self.createMaps(sx,sy,degVec)
-            print('init')
+        # sx,sy=img.shape[1],img.shape[0]
+        # if (sx != self.srcX) or (sy != self.srcY):
+        #     degVec = metadata["beamsDeg"]
+        #     self.createMaps(sx,sy,degVec)
+        #     print('init')
 
-        # warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_LINEAR)
-        warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_CUBIC)
+        # # warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_LINEAR)
+        # warped = cv2.remap(img, self.mapx, self.mapy, cv2.INTER_CUBIC)
         
-        return warped
+        # return warped
+        return self.cartesian_to_polar(metadata, img)
+    
+    
+    def cartesian_to_polar(self, metadata, sonar_data):
+        n_ranges = metadata['nRanges']
+        azimuth_bounds = np.deg2rad(metadata['beamsDeg'])
+        minus_width = int(np.floor(n_ranges * np.sin(azimuth_bounds[0])))
+        plus_width = int(np.ceil(n_ranges * np.sin(azimuth_bounds[-1])))
+        width = plus_width - minus_width
+        origin_x = abs(minus_width)
+
+        db = (azimuth_bounds[-1] - azimuth_bounds[0]) / metadata['nBeams'] if metadata['nBeams'] > 0 else 1
+        dy, dx = np.indices((n_ranges, width))
+        dx -= origin_x
+        dy = n_ranges - dy
+
+        range_val = np.sqrt(dx * dx + dy * dy).astype('int')
+        azimuth = np.arctan2(dx, dy)
+        yp = ((azimuth - azimuth_bounds[0]) / db).astype('int')
+
+        mask = (range_val >= 0) & (range_val < sonar_data.shape[0]) & (yp >= 0) & (yp < sonar_data.shape[1])
+        new_image = np.zeros(shape=(n_ranges, width), dtype='uint8')
+        new_image[dy[mask], dx[mask] + origin_x] = sonar_data[range_val[mask], yp[mask]]
+
+        return new_image
 
 
 
