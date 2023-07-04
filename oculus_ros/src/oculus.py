@@ -61,21 +61,31 @@ try:
       r = rospy.Rate(1000)
 
       while True:
-            
-            status = bpHandler.getStatusMsg(udpStatusSock)
-            if status is not None:
-               statusCnt += 1
-            if time.time() - statusTic >= 3:
-               sps = statusCnt/(time.time()-statusTic)
-               print("Status rate: %0.2fHz"%sps)
-               statusTic = time.time()
-               statusCnt = 0.0
-            
-            if (status is not None) and ('ipAddr' in status['status'].keys()):
-               print("Initiate Tcp connection to: %s "%status['status']['ipAddr'])
-               M1200dTcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-               M1200dTcpSock.connect( ("%s" %status['status']['ipAddr'], tcpPort) )
+            time.sleep(0.001)
+            try:
+               status = bpHandler.getStatusMsg(udpStatusSock)
+               if status is not None:
+                  statusCnt += 1
+               if time.time() - statusTic >= 3:
+                  sps = statusCnt/(time.time()-statusTic)
+                  print("Status rate: %0.2fHz"%sps)
+                  statusTic = time.time()
+                  statusCnt = 0.0
+               
+               if (status is not None) and ('ipAddr' in status['status'].keys()):
+                  print("Initiate Tcp connection to: %s "%status['status']['ipAddr'])
+                  M1200dTcpSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  M1200dTcpSock.connect( ("%s" %status['status']['ipAddr'], tcpPort) )
+                  break
+            except KeyboardInterrupt as e:
+               print(e)
                break
+            
+            if rospy.is_shutdown():
+                  print('exiting')
+                  # exit()
+                  break
+            r.sleep()
 
       
       # Handle sonar data
@@ -237,8 +247,9 @@ except:
    import traceback
    traceback.print_exc()
 finally:
-   print("terminate connection to sonar:tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
-   M1200dTcpSock.close() #"tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
+   if M1200dTcpSock is not None:
+      print("terminate connection to sonar:tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
+      M1200dTcpSock.close() #"tcp://%s:%s" %(status['status']['ipAddr'], tcpPort) )
    
          
    
